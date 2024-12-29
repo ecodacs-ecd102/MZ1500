@@ -12,3 +12,6 @@
  パッチ当ては
  https://github.com/ecodacs-ecd102/MZ1200-700/tree/main/tools
  のbpatch.plなどで。
+
+## etc
+ その他いろいろ
