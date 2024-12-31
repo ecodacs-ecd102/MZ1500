@@ -46,6 +46,7 @@ QD_WRITE_FILE	EQU		0F037H		; QDにファイルを書き込む
 QD_ERR_COMMON	EQU		0F2BBH		; QD I/O Common error process
 
 ES_CMD_W_SRAM	EQU		0F7E0H		; ES Command: After tape load success
+QD_BOOT_CHECK	EQU		0EA0EH		; Entry for trying boot from QD
 
 
 ES_CMD_MAIN	EQU		0F7BEH		; ES Command Main: Save SRAM from CMT
@@ -65,7 +66,7 @@ MSG_MR_QD	EQU		0EDF7H		; "Make ready QD"
 
 
 	ORG	0F890H
-MSG_SRAM_CLR:	DB	"SRAM C", 05H, "LEAR", 05H, 0DH
+MSG_SRAM_CLR:	DB	"SRAM ", 05H, "CLEAR", 05H, 0DH		; "SRAM clear"
 
 PATCH_1:
 	JP	Z,ES_CMD_MAIN		;EB34: CABEF7	"ʾ "	:  ES Command Main: Save SRAM from CMT
@@ -77,20 +78,23 @@ PATCH_1:
 ; EC CMD
 ;  C=1R12 port addr
 EC_CMD_MAIN:
-	LD	(11FEH),BC		; SAVE Port Addr
-	LD	DE,MSG_SRAM_CLR		; "SRAM Clear"
+	LD	(11FCH),BC		; SAVE Port Addr
+	LD	DE,MSG_SRAM_CLR		; "SRAM clear"
 	RST	18H
 	CALL	LETLN
 	CALL	CONFIRM_OK		; "OK(Y/N)"
-	LD	BC,(11FEH)		; Restore Port Addr
-	IN	A,(C)			; RESET ADDR CONTER
-	LD	B,9			; HEADER SIZE
-	INC	C			; C=DATA WRITE PORT
-	INC	C
-EC_10:
-	OUT	(C),B			; Header[9,8,7,6,5,4,3,2,1] = CSUM Error
-	DJNZ	EC_10
-	JP	ENT_COMMAND		; E804:Command input
+;
+; Check sum errorを出さないよう、
+; RAMボードチェックの後へ飛び込むようにダミーのデータを作り込む
+;
+	LD	HL,1			; $1200-1 から 1バイトの0を書き込む
+	LD	(TAPE_FSIZE),HL		; $1102
+	LD	HL,1200H-1
+	LD	(TAPE_LOAD_FROM),HL	; $1104
+	LD	(HL),0
+	LD	HL,QD_BOOT_CHECK	; スタートアドレスはIPL内のQDブートチェックルーチン
+	LD	(TAPE_EXEC),HL		; $1106
+	JP	EQ_CMD_50		; RAMボード書き込み
 ;
 ; EQ CMD
 ;  C=1R12 port addr
